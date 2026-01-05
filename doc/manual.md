@@ -37,6 +37,7 @@
       - [Writing and Loading Lock Files](#writing-and-loading-lock-files)
       - [Force Updating Pinned Packages](#force-updating-pinned-packages)
       - [Ensuring Pinned Versions](#ensuring-pinned-versions)
+    - [Native Compilation](#native-compilation)
   - [use-package Integration](#use-package-integration)
 - [UI](#ui)
   - [Searching](#searching)
@@ -770,6 +771,31 @@ To verify that pinned packages are at their declared versions:
 -   **elpaca-ensure-pinned-all:** Check all pinned packages and reset any that have drifted.
 
 For packages with only `:pin t` (no specific ref), these commands warn that no version can be ensured. For unpinned packages, they are skipped.
+
+
+<a id="native-compilation"></a>
+
+### Native Compilation
+
+By default, Elpaca does not natively compile installed packages during the build process. Emacs will natively compile packages on first use, which can cause slowdowns after installing or upgrading packages.
+
+-   **User Option: elpaca-native-compile:** Controls native compilation of installed packages. Requires Emacs with native compilation support (`native-comp-available-p` returns non-nil).
+    
+    Possible values:
+    
+    -   **`nil` (default):** No native compilation during package build. Emacs will natively compile packages on first use.
+    -   **`async`:** Queue packages for Emacs&rsquo; background native compilation immediately after byte compilation. Elpaca does not track completion; the build step finishes immediately.
+    -   **`sync`:** Perform synchronous native compilation as part of the build process. Elpaca tracks progress and reports when compilation is complete.
+
+```emacs-lisp
+;; Enable synchronous native compilation for full progress tracking
+(setq elpaca-native-compile 'sync)
+```
+
+```emacs-lisp
+;; Enable async native compilation (fire-and-forget)
+(setq elpaca-native-compile 'async)
+```
 
 
 <a id="use-package-integration"></a>

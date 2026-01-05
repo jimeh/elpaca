@@ -115,6 +115,16 @@ Setting it too high causes prints fewer status updates."
   "Seconds to wait between subprocess outputs before declaring process blocked."
   :type 'number)
 
+(defcustom elpaca-native-compile nil
+  "Control native compilation of installed packages.
+When nil, no native compilation is performed during package build.
+When `async', trigger Emacs' async native compilation (no progress tracking).
+When `sync', perform synchronous native compilation with progress tracking.
+Requires Emacs with native compilation support."
+  :type '(choice (const :tag "Off" nil)
+                 (const :tag "Async (fire-and-forget)" async)
+                 (const :tag "Sync (with progress)" sync)))
+
 (defcustom elpaca-build-steps '(elpaca--clone
                                 elpaca--configure-remotes
                                 elpaca--checkout-ref
@@ -124,6 +134,7 @@ Setting it too high causes prints fewer status updates."
                                 elpaca--link-build-files
                                 elpaca--generate-autoloads-async
                                 elpaca--byte-compile
+                                elpaca--native-compile
                                 elpaca--compile-info
                                 elpaca--install-info
                                 elpaca--add-info-path
@@ -1648,6 +1659,43 @@ Loads or caches autoloads."
           (add-to-list 'load-path dir)
           (normal-top-level-add-subdirs-to-load-path)))
       (byte-recompile-directory ,default-directory 0 'force))))
+
+(defun elpaca--native-compile (e)
+  "Native compile E's package if `elpaca-native-compile' is enabled."
+  (if (and elpaca-native-compile
+           (fboundp 'native-comp-available-p)
+           (native-comp-available-p))
+      (let* ((default-directory (elpaca<-build-dir e))
+             (dependency-dirs
+              (cl-loop for id in (elpaca-dependencies (elpaca<-id e) '(emacs))
+                       for dep = (elpaca-get id)
+                       for build-dir = (and dep (elpaca<-build-dir dep))
+                       when build-dir collect build-dir)))
+        (pcase elpaca-native-compile
+          ('async
+           (elpaca--signal e "Queuing async native compilation" 'native-compile)
+           (native-compile-async default-directory 'recursively)
+           (elpaca--continue-build e "Async native compilation queued"))
+          ('sync
+           (elpaca--signal e "Native compiling" 'native-compile)
+           (elpaca-with-emacs e
+             (:name "Native compilation")
+             ,@(when (boundp 'native-comp-eln-load-path)
+                 `((setq native-comp-eln-load-path ',native-comp-eln-load-path)))
+             (dolist (dir ',(cons default-directory dependency-dirs))
+               (let ((default-directory dir))
+                 (add-to-list 'load-path dir)
+                 (normal-top-level-add-subdirs-to-load-path)))
+             (dolist (file (directory-files-recursively ,default-directory "\\.elc\\'"))
+               (let ((el-file (concat (file-name-sans-extension file) ".el")))
+                 (when (file-exists-p el-file)
+                   (let ((eln-file (comp-el-to-eln-filename el-file)))
+                     (if (and eln-file (file-exists-p eln-file)
+                              (file-newer-than-file-p eln-file el-file))
+                         (message "Already compiled: %s" el-file)
+                       (message "Native compiling: %s" el-file)
+                       (native-compile el-file))))))))))
+    (elpaca--continue-build e)))
 
 ;;;###autoload
 (defun elpaca-dependencies (id &optional ignore interactive recurse)

@@ -654,6 +654,33 @@ To verify that pinned packages are at their declared versions:
 For packages with only =:pin t= (no specific ref), these commands warn that no version can be ensured.
 For unpinned packages, they are skipped.
 
+*** Native Compilation
+:PROPERTIES:
+:CUSTOM_ID: native-compilation
+:END:
+
+By default, Elpaca does not natively compile installed packages during the build process.
+Emacs will natively compile packages on first use, which can cause slowdowns after installing or upgrading packages.
+
+- User Option: elpaca-native-compile ::
+  Controls native compilation of installed packages.
+  Requires Emacs with native compilation support (=native-comp-available-p= returns non-nil).
+
+  Possible values:
+  - =nil= (default) :: No native compilation during package build. Emacs will natively compile packages on first use.
+  - =async= :: Queue packages for Emacs' background native compilation immediately after byte compilation. Elpaca does not track completion; the build step finishes immediately.
+  - =sync= :: Perform synchronous native compilation as part of the build process. Elpaca tracks progress and reports when compilation is complete.
+
+#+begin_src emacs-lisp :lexical t
+;; Enable synchronous native compilation for full progress tracking
+(setq elpaca-native-compile 'sync)
+#+end_src
+
+#+begin_src emacs-lisp :lexical t
+;; Enable async native compilation (fire-and-forget)
+(setq elpaca-native-compile 'async)
+#+end_src
+
 
 ** use-package Integration
 :PROPERTIES:
